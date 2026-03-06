@@ -1,0 +1,12 @@
+name = "binacs-apps"
+pages_build_output_dir = "public"
+compatibility_date = "2024-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "apps-db"
+database_id = "8c728aa3-a2c0-4c6a-bb93-dc2e264b5401"
+
+[vars]
+# Add your Gemini API Key here or in Cloudflare Dashboard
+# AI_API_KEY = "your-api-key" # Keep it in [dev.vars]
