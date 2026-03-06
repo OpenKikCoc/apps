@@ -4,6 +4,7 @@
 
 *   💊 **Medician**: 家庭药箱管理
 *   📝 **Pastebin**: 代码/笔记剪贴板
+*   📒 **Memos**: 随手记备忘录
 
 ---
 
@@ -31,7 +32,6 @@ docker-compose exec apps npm run db:init
     *   **Primary**: 计划使用的自定义域名 (如 `apps.binacs.space`)。
     *   **Secondary**: Pages 的默认域名 (如 prod `apps-xxx.pages.dev`, preview `*.apps-xxx.pages.dev`)。
 3.  **Policy**: 设置鉴权规则 (如 Email Allow)。
-4.  **Save**。*(此时拦截已生效)*
 
 ### 2. ⚡️ Pages 初始化
 **注意：请务必创建 Pages 项目，不要误选 Workers。**
@@ -51,8 +51,33 @@ docker-compose exec apps npm run db:init
 1.  **创建**: `npx wrangler d1 create apps-db` -> 复制 UUID 到 `wrangler.toml`。
 2.  **绑定**: Pages Settings -> **Functions/Bindings** -> Add binding (`DB` -> `apps-db`)。
 3.  **初始化**: `npx wrangler d1 execute apps-db --remote --file=schema.sql`。
-4.  **重试部署**: Deployments -> **Retry deployment** (使绑定生效)。
+4.  **重试部署**。
 
 ### 4. 🌐 域名上线
 1.  Pages Settings -> **Custom domains** -> 绑定 `apps.binacs.space`。
 2.  **验证**: 访问自定义域名和 Pages 默认域名，均应跳转 Access 登录页。
+
+---
+
+## 🛠️ 后续运维 (Operations)
+
+### 1. 数据库变更
+**新增表**: 修改 `schema.sql` 后执行:
+```bash
+# 本地
+docker-compose exec apps npm run db:init
+# 生产
+npx wrangler d1 execute apps-db --remote --file=schema.sql
+```
+
+**修改表**: 创建迁移文件 `migrations/xxxx.sql` 后执行:
+```bash
+# 本地
+docker-compose exec apps npx wrangler d1 execute apps-db --local --file=migrations/xxxx.sql
+# 生产
+npx wrangler d1 execute apps-db --remote --file=migrations/xxxx.sql
+```
+
+### 2. 新增模块
+*   **前端**: `public/<module>/index.html`
+*   **后端**: `functions/<module>/api/<logic>.js` (路由: `/<module>/api/<logic>`)

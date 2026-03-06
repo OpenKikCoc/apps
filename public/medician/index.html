@@ -16,13 +16,16 @@
 </head>
 <body class="bg-light">
     <div id="app" v-cloak>
-        <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4 sticky-top">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-success mb-4 sticky-top">
             <div class="container">
-                <a class="navbar-brand" href="#" @click="resetView"><i class="bi bi-capsule"></i> Medician</a>
-                <div class="d-flex gap-2 align-items-center">
-                    <a href="/" class="btn btn-outline-light btn-sm border-0">
-                        <i class="bi bi-house-door"></i> 首页
+                <div class="d-flex align-items-center">
+                    <a href="/" class="text-white me-3 text-decoration-none d-flex align-items-center" title="返回应用中心">
+                        <i class="bi bi-arrow-left me-2"></i>
+                        <i class="bi bi-grid-3x3-gap-fill fs-4"></i>
                     </a>
+                    <a class="navbar-brand" href="#" @click="resetView"><i class="bi bi-capsule"></i> Medician</a>
+                </div>
+                <div class="d-flex gap-2 align-items-center">
                     <button class="btn btn-outline-light btn-sm" @click="view = 'list'">
                         <i class="bi bi-list-ul"></i> 列表
                     </button>
@@ -47,7 +50,7 @@
                     <div class="col-md-4">
                         <div class="input-group">
                             <input type="text" class="form-control" v-model="searchQuery" placeholder="搜索药品或症状...">
-                            <button class="btn btn-outline-primary" type="button"><i class="bi bi-search"></i></button>
+                            <button class="btn btn-outline-success" type="button"><i class="bi bi-search"></i></button>
                         </div>
                     </div>
                 </div>
@@ -66,16 +69,16 @@
                             {{ showExpired ? '显示全部' : '只看过期' }}
                         </button>
                         
-                        <button class="btn btn-sm btn-primary ms-auto" @click="view = 'add'"><i class="bi bi-plus-lg"></i> 添加药品</button>
+                        <button class="btn btn-sm btn-success ms-auto" @click="view = 'add'"><i class="bi bi-plus-lg"></i> 添加药品</button>
                     </div>
 
                     <!-- Symptom Tags Cloud -->
                     <div v-if="allTags.length > 0" class="d-flex flex-wrap gap-2 p-3 bg-white rounded shadow-sm border">
                         <span class="text-muted small align-self-center">按症状筛选:</span>
-                        <span @click="selectedTag = null" class="badge rounded-pill text-decoration-none cursor-pointer" :class="!selectedTag ? 'bg-primary' : 'bg-light text-dark border'">全部</span>
+                        <span @click="selectedTag = null" class="badge rounded-pill text-decoration-none cursor-pointer" :class="!selectedTag ? 'bg-success' : 'bg-light text-dark border'">全部</span>
                         <span v-for="tag in allTags" :key="tag" @click="selectedTag = tag" 
                               class="badge rounded-pill text-decoration-none cursor-pointer" 
-                              :class="selectedTag === tag ? 'bg-primary' : 'bg-info text-dark bg-opacity-10 border border-info'">
+                              :class="selectedTag === tag ? 'bg-success' : 'bg-success text-success bg-opacity-10 border border-success'">
                             {{ tag }}
                         </span>
                     </div>
@@ -111,10 +114,10 @@
                             </div>
                         </div>
                     </div>
-                    <div v-if="filteredItems.length === 0" class="col-12 text-center py-5 text-muted">
+                        <div v-if="filteredItems.length === 0" class="col-12 text-center py-5 text-muted">
                         <p class="mb-3">没有找到匹配的药品。</p>
-                        <button v-if="selectedTag || searchQuery || showExpired" class="btn btn-outline-primary" @click="resetFilters">清除筛选</button>
-                        <button v-else class="btn btn-primary" @click="view = 'add'">添加药品</button>
+                        <button v-if="selectedTag || searchQuery || showExpired" class="btn btn-outline-success" @click="resetFilters">清除筛选</button>
+                        <button v-else class="btn btn-success" @click="view = 'add'">添加药品</button>
                     </div>
                 </div>
             </div>
@@ -137,7 +140,7 @@
                                         <p class="mt-2 text-muted">点击上传或拍照识别</p>
                                         <div class="d-flex justify-content-center gap-2">
                                             <input type="file" ref="fileInput" @change="handleFileUpload" accept="image/*" class="d-none" multiple>
-                                            <button class="btn btn-outline-primary" @click="$refs.fileInput.click()">
+                                            <button class="btn btn-outline-success" @click="$refs.fileInput.click()">
                                                 <i class="bi bi-images"></i> 批量选择图片
                                             </button>
                                             <button class="btn btn-outline-success" @click="startCamera">
@@ -215,7 +218,7 @@
                                     
                                     <div class="mt-4 d-flex justify-content-end gap-2 sticky-bottom bg-white p-3 border-top shadow-sm" style="bottom: 0; z-index: 100;">
                                         <button class="btn btn-outline-secondary" @click="batchItems = []">清空列表</button>
-                                        <button class="btn btn-primary" @click="submitBatch" :disabled="batchItems.some(i => i.status === 'scanning')">
+                                        <button class="btn btn-success" @click="submitBatch" :disabled="batchItems.some(i => i.status === 'scanning')">
                                             <i class="bi bi-check-circle"></i> 全部保存
                                         </button>
                                     </div>
@@ -263,7 +266,7 @@
                                         </div>
                                         <div class="mt-4 d-flex justify-content-end gap-2">
                                             <button type="button" class="btn btn-light" @click="resetForm">重置</button>
-                                            <button type="submit" class="btn btn-primary">保存药品</button>
+                                            <button type="submit" class="btn btn-success">保存药品</button>
                                         </div>
                                     </form>
                                 </div>

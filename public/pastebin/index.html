@@ -30,20 +30,23 @@
 </head>
 <body class="bg-light">
     <div id="app" v-cloak>
-        <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4 sticky-top">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 sticky-top">
             <div class="container">
-                <a class="navbar-brand" href="/pastebin/"><i class="bi bi-file-earmark-code"></i> Pastebin</a>
-                <div class="d-flex gap-2 align-items-center">
-                    <a href="/" class="btn btn-outline-light btn-sm border-0">
-                        <i class="bi bi-house-door"></i> 首页
+                <div class="d-flex align-items-center">
+                    <a href="/" class="text-white me-3 text-decoration-none d-flex align-items-center" title="返回应用中心">
+                        <i class="bi bi-arrow-left me-2"></i>
+                        <i class="bi bi-grid-3x3-gap-fill fs-4"></i>
                     </a>
+                    <a class="navbar-brand" href="/pastebin/"><i class="bi bi-file-earmark-code"></i> Pastebin</a>
+                </div>
+                <div class="d-flex gap-2 align-items-center">
                     <button v-if="viewMode === 'view'" class="btn btn-outline-light btn-sm" @click="createNew">
                         <i class="bi bi-plus-lg"></i> 新建
                     </button>
                     <button v-if="viewMode === 'edit'" class="btn btn-outline-light btn-sm d-md-none" @click="showPreview = !showPreview">
                         <i class="bi" :class="showPreview ? 'bi-pencil' : 'bi-eye'"></i> {{ showPreview ? '编辑' : '预览' }}
                     </button>
-                    <button v-if="viewMode === 'edit'" class="btn btn-light btn-sm text-primary fw-bold" @click="savePaste" :disabled="saving">
+                    <button v-if="viewMode === 'edit'" class="btn btn-light btn-sm text-dark fw-bold" @click="savePaste" :disabled="saving">
                         <i class="bi bi-save"></i> {{ saving ? '保存中...' : '保存' }}
                     </button>
                 </div>
@@ -89,7 +92,7 @@
                             <small class="text-muted">{{ formatDate(currentPaste.created_at) }}</small>
                         </div>
                         <div class="btn-group">
-                            <button class="btn btn-sm btn-outline-primary" @click="copyContent">
+                            <button class="btn btn-sm btn-outline-dark" @click="copyContent">
                                 <i class="bi bi-clipboard"></i> 复制
                             </button>
                             <button class="btn btn-sm btn-outline-danger" @click="deletePaste(currentPaste.id)">

@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subscriptions - 订阅管家</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+    <style>
+        .card-sub { transition: transform 0.2s; border-left: 5px solid transparent; }
+        .card-sub:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .card-sub.status-danger { border-left-color: #dc3545; }
+        .card-sub.status-warning { border-left-color: #ffc107; }
+        .card-sub.status-success { border-left-color: #198754; }
+        .card-sub.status-inactive { border-left-color: #6c757d; opacity: 0.7; }
+        
+        .progress-xs { height: 4px; }
+        .cursor-pointer { cursor: pointer; }
+        [v-cloak] { display: none; }
+        
+        .stat-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+    </style>
+</head>
+<body class="bg-light">
+    <div id="app" v-cloak>
+        <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4 sticky-top">
+            <div class="container">
+                <div class="d-flex align-items-center">
+                    <a href="/" class="text-white me-3 text-decoration-none d-flex align-items-center" title="返回应用中心">
+                        <i class="bi bi-arrow-left me-2"></i>
+                        <i class="bi bi-grid-3x3-gap-fill fs-4"></i>
+                    </a>
+                    <a class="navbar-brand" href="#" @click="view = 'list'"><i class="bi bi-credit-card-2-front"></i> Subscriptions</a>
+                </div>
+                <div class="d-flex gap-2 align-items-center">
+                    <button class="btn btn-outline-light btn-sm" @click="view = 'add'; resetForm()">
+                        <i class="bi bi-plus-circle"></i> 添加
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container">
+            <!-- Dashboard Stats -->
+            <div v-if="view === 'list'" class="row mb-4">
+                <div class="col-md-12">
+                    <div class="card stat-card shadow-sm border-0">
+                        <div class="card-body p-4 text-center">
+                            <h5 class="card-title opacity-75">月度固定支出 (预估)</h5>
+                            <h1 class="display-4 fw-bold">¥ {{ totalMonthlyCost.toFixed(2) }}</h1>
+                            <p class="mb-0 opacity-75">活跃订阅数: {{ activeCount }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- View: List -->
+            <div v-if="view === 'list'">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4 class="mb-0"><i class="bi bi-list-check"></i> 订阅列表</h4>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="showInactive" v-model="showInactive">
+                        <label class="form-check-label" for="showInactive">显示已停用</label>
+                    </div>
+                </div>
+
+                <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+                    <div class="col" v-for="sub in sortedSubscriptions" :key="sub.id">
+                        <div class="card h-100 card-sub" :class="'status-' + getStatus(sub).class" @click="editSubscription(sub)">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h5 class="card-title mb-0 text-truncate" :title="sub.name">{{ sub.name }}</h5>
+                                    <span class="badge rounded-pill" :class="'bg-' + getStatus(sub).class">
+                                        {{ getStatus(sub).text }}
+                                    </span>
+                                </div>
+                                
+                                <h6 class="card-subtitle mb-3 text-muted">
+                                    {{ sub.currency }} {{ sub.price }} / {{ getCycleLabel(sub.billing_cycle) }}
+                                </h6>
+                                
+                                <div v-if="sub.active">
+                                    <div class="d-flex justify-content-between small text-muted mb-1">
+                                        <span>下次扣款: {{ getNextDueDate(sub) }}</span>
+                                        <span>{{ getDaysRemaining(sub) }}天后</span>
+                                    </div>
+                                    <div class="progress progress-xs mb-3">
+                                        <div class="progress-bar" :class="'bg-' + getStatus(sub).class" role="progressbar" 
+                                             :style="{ width: getProgress(sub) + '%' }"></div>
+                                    </div>
+                                </div>
+                                <div v-else class="text-muted small mb-3">
+                                    <i class="bi bi-pause-circle"></i> 已暂停订阅
+                                </div>
+
+                                <p class="card-text small text-muted text-truncate" v-if="sub.description">
+                                    <i class="bi bi-chat-left-text"></i> {{ sub.description }}
+                                </p>
+                            </div>
+                            <div class="card-footer bg-transparent border-top-0 text-end">
+                                <small class="text-muted me-2">{{ sub.category }}</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div v-if="sortedSubscriptions.length === 0" class="col-12 text-center py-5 text-muted">
+                        <p class="mb-3">还没有订阅记录。</p>
+                        <button class="btn btn-primary" @click="view = 'add'; resetForm()">添加第一个订阅</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- View: Add/Edit Form -->
+            <div v-if="view === 'add' || view === 'edit'">
+                <div class="row justify-content-center">
+                    <div class="col-md-8 col-lg-6">
+                        <div class="card shadow-sm">
+                            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">{{ view === 'add' ? '添加订阅' : '编辑订阅' }}</h5>
+                                <button class="btn-close" @click="view = 'list'"></button>
+                            </div>
+                            <div class="card-body">
+                                <form @submit.prevent="submitForm">
+                                    <div class="mb-3">
+                                        <label class="form-label">服务名称 *</label>
+                                        <input type="text" class="form-control" v-model="form.name" required placeholder="例如: Netflix, Spotify">
+                                    </div>
+                                    
+                                    <div class="row g-3 mb-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label">价格 *</label>
+                                            <div class="input-group">
+                                                <input type="number" step="0.01" class="form-control" v-model="form.price" required>
+                                                <select class="form-select" v-model="form.currency" style="max-width: 100px;">
+                                                    <option value="CNY">CNY</option>
+                                                    <option value="USD">USD</option>
+                                                    <option value="HKD">HKD</option>
+                                                    <option value="JPY">JPY</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">周期 *</label>
+                                            <select class="form-select" v-model="form.billing_cycle" required>
+                                                <option value="monthly">每月</option>
+                                                <option value="yearly">每年</option>
+                                                <option value="weekly">每周</option>
+                                                <option value="quarterly">每季度</option>
+                                                <option value="onetime">一次性 (证件)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-3 mb-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label">起始/最近扣款日 *</label>
+                                            <input type="date" class="form-control" v-model="form.start_date" required>
+                                            <div class="form-text">以此日期计算下次扣款时间</div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">分类</label>
+                                            <select class="form-select" v-model="form.category">
+                                                <option value="entertainment">娱乐 (影视/音乐)</option>
+                                                <option value="utility">工具 (软件/云服务)</option>
+                                                <option value="life">生活 (水电/房租)</option>
+                                                <option value="insurance">保险/证件</option>
+                                                <option value="other">其他</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">备注</label>
+                                        <textarea class="form-control" v-model="form.description" rows="2" placeholder="例如: 绑定的是招行信用卡"></textarea>
+                                    </div>
+
+                                    <div class="mb-4 form-check form-switch" v-if="view === 'edit'">
+                                        <input class="form-check-input" type="checkbox" id="activeSwitch" v-model="form.active" :true-value="1" :false-value="0">
+                                        <label class="form-check-label" for="activeSwitch">启用订阅 (计入统计)</label>
+                                    </div>
+
+                                    <div class="d-flex justify-content-between">
+                                        <button type="button" class="btn btn-outline-danger" v-if="view === 'edit'" @click="deleteSubscription">删除</button>
+                                        <div class="ms-auto">
+                                            <button type="button" class="btn btn-light me-2" @click="view = 'list'">取消</button>
+                                            <button type="submit" class="btn btn-primary">保存</button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    view: 'list',
+                    subscriptions: [],
+                    showInactive: false,
+                    form: {
+                        id: null, name: '', price: 0, currency: 'CNY', 
+                        billing_cycle: 'monthly', start_date: '', 
+                        category: 'entertainment', description: '', active: 1
+                    }
+                }
+            },
+            computed: {
+                activeCount() {
+                    return this.subscriptions.filter(s => s.active).length;
+                },
+                sortedSubscriptions() {
+                    let list = this.subscriptions;
+                    if (!this.showInactive) {
+                        list = list.filter(s => s.active);
+                    }
+                    
+                    // Sort by days remaining (urgent first)
+                    return list.sort((a, b) => {
+                        if (!a.active) return 1;
+                        if (!b.active) return -1;
+                        return this.getDaysRemaining(a) - this.getDaysRemaining(b);
+                    });
+                },
+                totalMonthlyCost() {
+                    return this.subscriptions
+                        .filter(s => s.active)
+                        .reduce((sum, sub) => {
+                            let monthlyPrice = sub.price;
+                            // Simple currency conversion placeholder (1 USD = 7 CNY)
+                            // Ideally this should be dynamic or handled better
+                            let rate = 1; 
+                            if (sub.currency === 'USD') rate = 7.2;
+                            if (sub.currency === 'HKD') rate = 0.9;
+                            if (sub.currency === 'JPY') rate = 0.05;
+                            
+                            const priceInCNY = sub.price * rate;
+
+                            switch(sub.billing_cycle) {
+                                case 'yearly': monthlyPrice = priceInCNY / 12; break;
+                                case 'quarterly': monthlyPrice = priceInCNY / 3; break;
+                                case 'weekly': monthlyPrice = priceInCNY * 4.33; break;
+                                case 'onetime': monthlyPrice = 0; break; // Don't count onetime
+                                default: monthlyPrice = priceInCNY;
+                            }
+                            return sum + monthlyPrice;
+                        }, 0);
+                }
+            },
+            mounted() {
+                this.fetchSubscriptions();
+            },
+            methods: {
+                getApiUrl(endpoint) {
+                    const basePath = window.location.pathname.startsWith('/subscriptions') ? '/subscriptions/api' : '/api';
+                    return `${basePath}${endpoint}`;
+                },
+                async fetchSubscriptions() {
+                    try {
+                        const res = await fetch(this.getApiUrl('/list'));
+                        if (res.ok) {
+                            this.subscriptions = await res.json();
+                        }
+                    } catch (e) {
+                        console.error("Failed to fetch subscriptions", e);
+                    }
+                },
+                getNextDueDate(sub) {
+                    const start = new Date(sub.start_date);
+                    const today = new Date();
+                    today.setHours(0,0,0,0);
+                    
+                    let next = new Date(start);
+                    
+                    // If start date is in future, that is the next date
+                    if (next > today) return next.toISOString().split('T')[0];
+
+                    // Loop to find next date
+                    while (next <= today) {
+                        switch(sub.billing_cycle) {
+                            case 'monthly': next.setMonth(next.getMonth() + 1); break;
+                            case 'yearly': next.setFullYear(next.getFullYear() + 1); break;
+                            case 'weekly': next.setDate(next.getDate() + 7); break;
+                            case 'quarterly': next.setMonth(next.getMonth() + 3); break;
+                            case 'onetime': return sub.start_date; // No next date for onetime
+                        }
+                    }
+                    return next.toISOString().split('T')[0];
+                },
+                getDaysRemaining(sub) {
+                    if (sub.billing_cycle === 'onetime') {
+                        const target = new Date(sub.start_date);
+                        const today = new Date();
+                        today.setHours(0,0,0,0);
+                        const diff = Math.ceil((target - today) / (1000 * 60 * 60 * 24));
+                        return diff;
+                    }
+
+                    const nextDate = new Date(this.getNextDueDate(sub));
+                    const today = new Date();
+                    today.setHours(0,0,0,0);
+                    const diffTime = nextDate - today;
+                    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                },
+                getStatus(sub) {
+                    if (!sub.active) return { class: 'inactive', text: '已停用' };
+                    
+                    const days = this.getDaysRemaining(sub);
+                    if (days < 0 && sub.billing_cycle === 'onetime') return { class: 'danger', text: '已过期' };
+                    if (days <= 3) return { class: 'danger', text: '即将扣款' };
+                    if (days <= 7) return { class: 'warning', text: '临近' };
+                    return { class: 'success', text: '正常' };
+                },
+                getProgress(sub) {
+                    if (sub.billing_cycle === 'onetime') return 100;
+                    
+                    // Approximate progress in current cycle
+                    const next = new Date(this.getNextDueDate(sub));
+                    const today = new Date();
+                    
+                    let prev = new Date(next);
+                     switch(sub.billing_cycle) {
+                        case 'monthly': prev.setMonth(prev.getMonth() - 1); break;
+                        case 'yearly': prev.setFullYear(prev.getFullYear() - 1); break;
+                        case 'weekly': prev.setDate(prev.getDate() - 7); break;
+                        case 'quarterly': prev.setMonth(prev.getMonth() - 3); break;
+                    }
+                    
+                    const total = next - prev;
+                    const elapsed = today - prev;
+                    return Math.min(100, Math.max(0, (elapsed / total) * 100));
+                },
+                getCycleLabel(cycle) {
+                    const map = {
+                        'monthly': '月', 'yearly': '年', 'weekly': '周', 
+                        'quarterly': '季', 'onetime': '次'
+                    };
+                    return map[cycle] || cycle;
+                },
+                resetForm() {
+                    this.form = {
+                        id: null, name: '', price: 0, currency: 'CNY', 
+                        billing_cycle: 'monthly', start_date: new Date().toISOString().split('T')[0], 
+                        category: 'entertainment', description: '', active: 1
+                    };
+                },
+                editSubscription(sub) {
+                    this.form = { ...sub };
+                    this.view = 'edit';
+                },
+                async submitForm() {
+                    const endpoint = this.view === 'add' ? '/add' : '/update';
+                    const method = this.view === 'add' ? 'POST' : 'PUT';
+                    
+                    const res = await fetch(this.getApiUrl(endpoint), {
+                        method: method,
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(this.form)
+                    });
+                    
+                    if (res.ok) {
+                        this.view = 'list';
+                        this.fetchSubscriptions();
+                    } else {
+                        alert('保存失败');
+                    }
+                },
+                async deleteSubscription() {
+                    if (!confirm('确定删除此订阅记录吗?')) return;
+                    
+                    const res = await fetch(this.getApiUrl('/delete'), {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: this.form.id })
+                    });
+                    
+                    if (res.ok) {
+                        this.view = 'list';
+                        this.fetchSubscriptions();
+                    } else {
+                        alert('删除失败');
+                    }
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

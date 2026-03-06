@@ -7,7 +7,7 @@
     "build": "echo 'Build is no longer needed as public/ structure matches output'",
     "deploy": "wrangler pages deploy public",
     "db:init": "wrangler d1 execute apps-db --local --file=schema.sql",
-    "db:prod:init": "wrangler d1 execute apps-db --file=schema.sql"
+    "db:prod:init": "wrangler d1 execute apps-db --remote --file=schema.sql"
   },
   "devDependencies": {
     "wrangler": "^3.0.0"
