@@ -10,6 +10,6 @@
     "db:prod:init": "wrangler d1 execute apps-db --file=schema.sql"
   },
   "devDependencies": {
-    "wrangler": "^3.0.0"
+    "wrangler": "^4.71.0"
   }
 }
