@@ -1,0 +1,13 @@
+services:
+  apps:
+    build: .
+    container_name: binacs-apps
+    ports:
+      - "8788:8788"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.wrangler # Persist local D1 database state
+    environment:
+      - AI_API_KEY=${AI_API_KEY-}
+    restart: unless-stopped
