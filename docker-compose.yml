@@ -10,5 +10,6 @@ services:
       - /app/.wrangler # Persist local D1 database state
     environment:
       - AI_API_KEY=${AI_API_KEY-}
+      - AI_MODEL=${AI_MODEL-}
     command: npx wrangler pages dev public --ip 0.0.0.0 --port 8788 --no-show-interactive-dev-session
     restart: unless-stopped

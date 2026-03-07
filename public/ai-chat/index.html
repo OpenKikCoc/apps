@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AI Chat - 智能助手</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.2.0/github-markdown-light.css">
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        body { background-color: #f8f9fa; height: 100vh; display: flex; overflow: hidden; }
+        
+        /* Sidebar */
+        .sidebar { 
+            width: 280px; 
+            background: #212529; 
+            color: white; 
+            display: flex; 
+            flex-direction: column; 
+            transition: width 0.3s ease, transform 0.3s ease; 
+            z-index: 1050; 
+            height: 100%; 
+            flex-shrink: 0;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+        
+        /* Desktop: Sidebar can be toggled via transform or width, here we use absolute positioning for overlay or flex for push */
+        @media (min-width: 769px) {
+            .sidebar { 
+                width: 0; 
+                min-width: 0;
+                transition: width 0.3s ease; /* Ensure transition is smooth */
+            }
+            .sidebar.open { 
+                width: 280px; 
+                min-width: 280px;
+            }
+        }
+        .sidebar-header { padding: 15px; border-bottom: 1px solid #343a40; display: flex; justify-content: space-between; align-items: center; }
+        .session-list { flex: 1; overflow-y: auto; padding: 10px; }
+        .session-item { padding: 10px; border-radius: 5px; cursor: pointer; margin-bottom: 5px; transition: background 0.2s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; position: relative; }
+        .session-item:hover { background: #343a40; }
+        .session-item.active { background: #0d6efd; }
+        .session-item .delete-btn { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); display: none; color: #dc3545; padding: 2px 6px; }
+        .session-item:hover .delete-btn { display: block; background: rgba(0,0,0,0.5); border-radius: 4px; }
+        
+        /* Main Chat Area */
+        .main-content { 
+            flex: 1; 
+            display: flex; 
+            flex-direction: column; 
+            height: 100%; 
+            position: relative; 
+            min-width: 0; /* Important for flex child to shrink properly */
+        }
+        
+        /* Hide secondary navbar inside main content since we moved it to top */
+        .main-content > nav { display: none !important; }
+        .chat-container { flex: 1; overflow-y: auto; padding: 20px; padding-bottom: 20px; scroll-behavior: smooth; }
+        
+        /* Messages */
+        .message-card { 
+            max-width: 85%; 
+            margin-bottom: 20px; 
+            border-radius: 12px; 
+            padding: 12px 16px; 
+            position: relative; 
+            word-wrap: break-word; 
+            width: fit-content; /* Allow card to fit content width */
+        }
+        .message-user { align-self: flex-end; background-color: #0d6efd; color: white; margin-left: auto; border-bottom-right-radius: 4px; }
+        .message-ai { align-self: flex-start; background-color: white; border: 1px solid #dee2e6; margin-right: auto; border-bottom-left-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        
+        /* Input Area */
+        .input-area { background: white; border-top: 1px solid #dee2e6; padding: 15px; z-index: 1000; }
+        .preview-area { position: absolute; bottom: 100%; left: 0; right: 0; background: rgba(255,255,255,0.95); padding: 10px 15px; border-top: 1px solid #dee2e6; display: flex; gap: 10px; align-items: center; backdrop-filter: blur(5px); }
+        .preview-img { height: 60px; width: 60px; object-fit: cover; border-radius: 8px; border: 1px solid #ddd; }
+        
+        /* Markdown Styles Override */
+        .markdown-body { font-size: 1rem; line-height: 1.6; background-color: transparent !important; }
+        .markdown-body pre { background-color: #f6f8fa; border-radius: 6px; padding: 16px; overflow: auto; }
+        .message-user .markdown-body { color: white; }
+        .message-user .markdown-body code { color: #e6e6e6; background: rgba(255,255,255,0.2); }
+        .message-user .markdown-body pre { background: rgba(0,0,0,0.1); color: white; }
+        .message-user a { color: #e0e0e0; text-decoration: underline; }
+
+        /* Auto-resize textarea */
+        textarea.form-control { resize: none; overflow-y: hidden; min-height: 40px; max-height: 150px; padding-top: 10px; padding-bottom: 10px; }
+        
+        /* Mobile Toggle */
+        .mobile-toggle { display: none; }
+        
+        [v-cloak] { display: none; }
+
+        /* Mobile: Overlay */
+        @media (max-width: 768px) {
+            .sidebar { 
+                position: absolute; 
+                width: 280px;
+                transform: translateX(-100%);
+            }
+            .sidebar.open { 
+                transform: translateX(0); 
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app" v-cloak class="d-flex flex-column h-100 w-100">
+        <!-- Top Navbar (Global) -->
+        <nav class="navbar navbar-expand-lg navbar-dark bg-info mb-0 flex-shrink-0 z-index-1060" style="z-index: 1060;">
+            <div class="container">
+                <div class="d-flex align-items-center w-100 justify-content-between">
+                    <div class="d-flex align-items-center">
+                        <button class="btn btn-link text-white mobile-toggle p-0 me-3 d-md-none" @click="showSidebar = !showSidebar">
+                            <i class="bi bi-list fs-4"></i>
+                        </button>
+                        <a href="/" class="text-white me-3 text-decoration-none d-flex align-items-center" title="返回应用中心">
+                            <i class="bi bi-arrow-left me-2"></i>
+                            <i class="bi bi-grid-3x3-gap-fill fs-4"></i>
+                        </a>
+                        <a class="navbar-brand" href="/ai-chat/"><i class="bi bi-robot"></i> AI Chat</a>
+                        <span class="navbar-text text-white border-start border-white ps-3 ms-2 d-none d-md-inline text-truncate" style="max-width: 300px; opacity: 0.8;" v-if="currentSessionTitle && currentSessionTitle !== '新会话'">
+                            {{ currentSessionTitle }}
+                        </span>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-light btn-sm" @click="createNewSession" title="新会话">
+                            <i class="bi bi-plus-lg"></i> <span class="d-none d-sm-inline">新会话</span>
+                        </button>
+                        <button class="btn btn-outline-light btn-sm" @click="showSidebar = !showSidebar" title="历史记录" class="d-none d-md-block">
+                            <i class="bi bi-clock-history"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <div class="d-flex flex-grow-1 overflow-hidden position-relative">
+            <!-- Sidebar -->
+            <div class="sidebar" :class="{ open: showSidebar }">
+            <div class="sidebar-header">
+                <span class="fw-bold"><i class="bi bi-chat-square-text"></i> 历史会话</span>
+                <button class="btn btn-sm btn-outline-secondary text-white border-0" @click="createNewSession" title="新会话">
+                    <i class="bi bi-plus-lg fs-5"></i>
+                </button>
+            </div>
+            <div class="session-list">
+                <div v-for="session in sessions" :key="session.id" 
+                     class="session-item" 
+                     :class="{ active: currentSessionId === session.id }"
+                     @click="loadSession(session.id)">
+                    <i class="bi bi-chat-left-text me-2 small"></i>
+                    {{ session.title || '新会话' }}
+                    <span class="delete-btn" @click.stop="deleteSession(session.id)">
+                        <i class="bi bi-trash"></i>
+                    </span>
+                </div>
+                <div v-if="sessions.length === 0" class="text-center text-muted mt-4 small">
+                    暂无历史记录
+                </div>
+            </div>
+            <!-- Sidebar Footer (Mobile Close) -->
+            <div class="p-3 d-md-none border-top border-secondary">
+                <button class="btn btn-secondary w-100" @click="showSidebar = false">关闭菜单</button>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Chat Area -->
+            <div class="chat-container d-flex flex-column" ref="chatContainer" @click="handleChatClick">
+                <div v-if="messages.length === 0" class="text-center text-muted my-auto">
+                    <div class="mb-3">
+                        <i class="bi bi-robot display-1 text-secondary opacity-25"></i>
+                    </div>
+                    <h5>你好！我是你的 AI 助手</h5>
+                    <p class="small">我可以帮你回答问题、分析图片或解释代码。</p>
+                </div>
+
+                <div v-for="(msg, index) in messages" :key="index" 
+                     class="message-card"
+                     :class="msg.role === 'user' ? 'message-user' : 'message-ai'">
+                    
+                    <!-- User Image/File Preview -->
+                    <div v-if="msg.fileUrl" class="mb-2">
+                        <img v-if="msg.fileType && msg.fileType.startsWith('image/')" :src="msg.fileUrl" class="img-fluid rounded border" style="max-height: 200px;">
+                        <div v-else class="p-2 bg-light rounded text-dark d-flex align-items-center border">
+                            <i class="bi bi-file-earmark-text me-2 fs-4 text-primary"></i> 
+                            <span class="text-truncate">{{ msg.fileName }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Text Content -->
+                    <div class="markdown-body" v-html="renderMarkdown(msg.content)"></div>
+                    
+                    <!-- Loading Indicator -->
+                    <div v-if="msg.loading" class="d-flex align-items-center mt-2 text-muted small">
+                        <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                        <span>思考中...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="input-area position-relative">
+                <div class="container-fluid px-0">
+                    <!-- File Preview Overlay -->
+                    <div v-if="selectedFile" class="preview-area shadow-sm rounded-top">
+                        <div class="position-relative">
+                            <img v-if="selectedFile.type.startsWith('image/')" :src="previewUrl" class="preview-img">
+                            <div v-else class="preview-img d-flex align-items-center justify-content-center bg-light text-secondary border rounded">
+                                <i class="bi bi-file-earmark fs-3"></i>
+                            </div>
+                            <button class="btn btn-danger btn-sm rounded-circle position-absolute top-0 start-100 translate-middle p-0 d-flex align-items-center justify-content-center shadow-sm" 
+                                    style="width: 20px; height: 20px; border: 2px solid white;" @click="clearFile">
+                                <i class="bi bi-x small"></i>
+                            </button>
+                        </div>
+                        <div class="d-flex flex-column overflow-hidden">
+                            <span class="text-truncate fw-bold small text-dark">{{ selectedFile.name }}</span>
+                            <span class="text-muted small">{{ formatFileSize(selectedFile.size) }}</span>
+                        </div>
+                    </div>
+
+                    <form @submit.prevent="sendMessage" class="d-flex gap-2 align-items-end">
+                        <input type="file" ref="fileInput" @change="handleFileSelect" class="d-none">
+                        
+                        <button type="button" class="btn btn-light border text-secondary rounded-circle" 
+                                style="width: 40px; height: 40px;"
+                                @click="$refs.fileInput.click()" title="上传图片/文件">
+                            <i class="bi bi-paperclip"></i>
+                        </button>
+                        
+                        <textarea 
+                            ref="textarea"
+                            class="form-control rounded-4" 
+                            v-model="inputMessage" 
+                            placeholder="输入消息..." 
+                            :disabled="loading"
+                            rows="1"
+                            @input="autoResize"
+                            @keydown.enter.exact.prevent="sendMessage"
+                        ></textarea>
+                        
+                        <button type="submit" class="btn btn-primary rounded-circle" 
+                                style="width: 40px; height: 40px;"
+                                :disabled="loading || (!inputMessage.trim() && !selectedFile)">
+                            <i class="bi bi-send-fill"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    sessions: [],
+                    currentSessionId: null,
+                    messages: [],
+                    inputMessage: '',
+                    selectedFile: null,
+                    previewUrl: null,
+                    loading: false,
+                    showSidebar: false
+                }
+            },
+            computed: {
+                currentSessionTitle() {
+                    const session = this.sessions.find(s => s.id === this.currentSessionId);
+                    return session ? session.title : '新会话';
+                }
+            },
+            mounted() {
+                this.fetchSessions();
+                // Check for session in URL
+                const urlParams = new URLSearchParams(window.location.search);
+                const sid = urlParams.get('session_id');
+                if (sid) {
+                    this.loadSession(sid);
+                }
+            },
+            methods: {
+                renderMarkdown(text) {
+                    if (!text) return '';
+                    marked.setOptions({ breaks: true });
+                    return marked.parse(text);
+                },
+                async fetchSessions() {
+                    try {
+                        const res = await fetch('/ai-chat/api/sessions');
+                        const data = await res.json();
+                        if (data.success) {
+                            this.sessions = data.data;
+                        }
+                    } catch (e) {
+                        console.error("Failed to fetch sessions", e);
+                    }
+                },
+                async loadSession(sessionId) {
+                    this.currentSessionId = sessionId;
+                    this.showSidebar = false; // Close sidebar on mobile
+                    this.messages = [];
+                    this.loading = true;
+                    
+                    // Update URL without reload
+                    const url = new URL(window.location);
+                    url.searchParams.set('session_id', sessionId);
+                    window.history.pushState({}, '', url);
+
+                    try {
+                        const res = await fetch(`/ai-chat/api/messages?session_id=${sessionId}`);
+                        const data = await res.json();
+                        if (data.success) {
+                            this.messages = data.data.map(msg => ({
+                                role: msg.role,
+                                content: msg.content,
+                                // Note: DB doesn't store file URLs nicely yet, so we just show content
+                                // Future improvement: store structured content in DB
+                            }));
+                            this.scrollToBottom();
+                        }
+                    } catch (e) {
+                        console.error("Failed to load messages", e);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                createNewSession() {
+                    this.currentSessionId = null;
+                    this.messages = [];
+                    this.inputMessage = '';
+                    this.clearFile();
+                    this.showSidebar = false;
+                    
+                    // Clear URL param
+                    const url = new URL(window.location);
+                    url.searchParams.delete('session_id');
+                    window.history.pushState({}, '', url);
+                },
+                async deleteSession(id) {
+                    if(!confirm('确定删除此会话?')) return;
+                    try {
+                        await fetch(`/ai-chat/api/sessions?id=${id}`, { method: 'DELETE' });
+                        this.fetchSessions();
+                        if (this.currentSessionId === id) {
+                            this.createNewSession();
+                        }
+                    } catch (e) {
+                        alert('删除失败');
+                    }
+                },
+                handleFileSelect(event) {
+                    const file = event.target.files[0];
+                    if (file) {
+                        this.selectedFile = file;
+                        this.previewUrl = URL.createObjectURL(file);
+                        this.$nextTick(() => this.$refs.textarea.focus());
+                    }
+                },
+                handleChatClick() {
+                    if (window.innerWidth < 768) {
+                        this.showSidebar = false;
+                    }
+                },
+                clearFile() {
+                    this.selectedFile = null;
+                    this.previewUrl = null;
+                    this.$refs.fileInput.value = '';
+                },
+                scrollToBottom() {
+                    this.$nextTick(() => {
+                        const container = this.$refs.chatContainer;
+                        container.scrollTop = container.scrollHeight;
+                    });
+                },
+                autoResize() {
+                    const textarea = this.$refs.textarea;
+                    textarea.style.height = 'auto';
+                    textarea.style.height = textarea.scrollHeight + 'px';
+                },
+                formatFileSize(bytes) {
+                    if (bytes === 0) return '0 B';
+                    const k = 1024;
+                    const sizes = ['B', 'KB', 'MB', 'GB'];
+                    const i = Math.floor(Math.log(bytes) / Math.log(k));
+                    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+                },
+                async sendMessage() {
+                    if ((!this.inputMessage.trim() && !this.selectedFile) || this.loading) return;
+
+                    const userMsg = {
+                        role: 'user',
+                        content: this.inputMessage.trim(),
+                        fileUrl: this.previewUrl,
+                        fileType: this.selectedFile ? this.selectedFile.type : null,
+                        fileName: this.selectedFile ? this.selectedFile.name : null
+                    };
+                    this.messages.push(userMsg);
+                    
+                    // Prepare data
+                    const formData = new FormData();
+                    if (this.inputMessage.trim()) formData.append('message', this.inputMessage.trim());
+                    if (this.selectedFile) formData.append('file', this.selectedFile);
+                    if (this.currentSessionId) formData.append('session_id', this.currentSessionId);
+
+                    // Clear input
+                    this.inputMessage = '';
+                    this.clearFile(); 
+                    this.$nextTick(() => {
+                        this.$refs.textarea.style.height = 'auto';
+                    });
+                    
+                    this.loading = true;
+                    this.scrollToBottom();
+
+                    // Placeholder for AI response
+                    const aiMsgIndex = this.messages.push({
+                        role: 'assistant', // Use 'assistant' to match DB/API role
+                        content: '',
+                        loading: true
+                    }) - 1;
+                    this.scrollToBottom();
+
+                    try {
+                        const res = await fetch('/ai-chat/api/chat', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        const data = await res.json();
+                        
+                        if (data.success) {
+                            this.messages[aiMsgIndex].content = data.data.response;
+                            
+                            // If this was a new session, update ID and list
+                            if (data.data.is_new_session) {
+                                this.currentSessionId = data.data.session_id;
+                                const url = new URL(window.location);
+                                url.searchParams.set('session_id', this.currentSessionId);
+                                window.history.pushState({}, '', url);
+                                this.fetchSessions(); // Refresh sidebar
+                            }
+                        } else {
+                            this.messages[aiMsgIndex].content = '**Error:** ' + (data.error || 'Unknown error');
+                        }
+                    } catch (e) {
+                        this.messages[aiMsgIndex].content = '**Network Error:** ' + e.message;
+                    } finally {
+                        this.messages[aiMsgIndex].loading = false;
+                        this.loading = false;
+                        this.scrollToBottom();
+                    }
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

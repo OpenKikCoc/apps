@@ -2,10 +2,6 @@
 
 基于 Cloudflare Pages (Functions) + D1 的 Monorepo 应用集。
 
-*   💊 **Medician**: 家庭药箱管理
-*   📝 **Pastebin**: 代码/笔记剪贴板
-*   📒 **Memos**: 随手记备忘录
-
 ---
 
 ## 🚀 本地开发 (Docker)
@@ -44,7 +40,7 @@ docker-compose exec apps npm run db:init
     *   **Build output directory**: `public` (by default 可以不写)
     *   **Root directory**: `/` (默认)
     *   *(如果看到 "Deploy command" 选项，说明选错了项目类型，请重新创建 Pages 项目)*
-4.  **Environment variables**: 添加 `AI_API_KEY` (Gemini API Key)。
+4.  **Environment variables**: 添加 `AI_API_KEY` / `AI_MODEL`。
 5.  **Save and Deploy**。
 
 ### 3. 🗄️ 数据库绑定

@@ -40,3 +40,24 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     active INTEGER DEFAULT 1,    -- 1=active, 0=inactive
     created_at INTEGER
 );
+
+-- AI Chat Tables
+CREATE TABLE IF NOT EXISTS ai_sessions (
+    id TEXT PRIMARY KEY,
+    title TEXT,
+    created_at INTEGER,
+    updated_at INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS ai_messages (
+    id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    role TEXT NOT NULL, -- 'user' or 'assistant'
+    content TEXT NOT NULL,
+    created_at INTEGER,
+    FOREIGN KEY (session_id) REFERENCES ai_sessions(id) ON DELETE CASCADE
+);
+
+-- Indexes for AI Chat performance optimization
+CREATE INDEX IF NOT EXISTS idx_ai_messages_session_id ON ai_messages(session_id);
+CREATE INDEX IF NOT EXISTS idx_ai_sessions_updated_at ON ai_sessions(updated_at);

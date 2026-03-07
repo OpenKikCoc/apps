@@ -6,6 +6,10 @@ export async function onRequestPost(context) {
 
   // Mock Mode Check: If no API Key is set, return simulated data
   const API_KEY = context.env.AI_API_KEY;
+  // Use AI_MODEL env var for the Volcengine Model Name
+  // For Coding Plan, this MUST be "ark-code-latest"
+  const MODEL_ID = context.env.AI_MODEL || "ark-code-latest"; 
+
   if (!API_KEY) {
     await new Promise(r => setTimeout(r, 1000)); // Simulate network delay
     return Response.json({
@@ -23,51 +27,70 @@ export async function onRequestPost(context) {
     });
   }
 
-  // Real AI Call (Gemini Example)
+  if (!MODEL_ID) {
+      return new Response(JSON.stringify({ error: "Missing AI_MODEL environment variable" }), { status: 500 });
+  }
+
+  // Real AI Call (Volcengine Ark Coding Plan - OpenAI Compatible)
   try {
     const arrayBuffer = await file.arrayBuffer();
     const base64Image = btoa(
       new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
     );
 
-    // Google Gemini API
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+    const mimeType = file.type || 'image/jpeg';
+    const url = `https://ark.cn-beijing.volces.com/api/coding/v3/chat/completions`;
     
     const response = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${API_KEY}`
+      },
       body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: "Identify this medicine. Return ONLY valid JSON with fields: name, brand, quantity (integer guess), unit, expiry_date (YYYY-MM-DD), dosage, indications (array of strings). Do not use markdown formatting." },
-            { inline_data: { mime_type: "image/jpeg", data: base64Image } }
-          ]
-        }]
+        model: MODEL_ID,
+        messages: [
+            {
+                role: "user",
+                content: [
+                    { type: "text", text: "Identify this medicine. Return ONLY valid JSON with fields: name, brand, quantity (integer guess), unit, expiry_date (YYYY-MM-DD), dosage, indications (array of strings). Do not use markdown formatting." },
+                    { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Image}` } }
+                ]
+            }
+        ]
       })
     });
 
     if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Gemini API Error: ${response.status} ${errorText}`);
+        throw new Error(`Volcengine API Error: ${response.status} ${errorText}`);
     }
 
     const result = await response.json();
     
-    // Parse Gemini response (which might be wrapped in text)
-    if (!result.candidates || !result.candidates[0] || !result.candidates[0].content) {
-         throw new Error("Invalid response structure from Gemini");
+    // Parse OpenAI-compatible response
+    if (!result.choices || !result.choices[0] || !result.choices[0].message) {
+         throw new Error("Invalid response structure from Volcengine (OpenAI Compatible)");
     }
 
-    let text = result.candidates[0].content.parts[0].text;
+    let text = result.choices[0].message.content;
+    
     // Clean markdown code blocks if present
     text = text.replace(/```json/g, '').replace(/```/g, '').trim();
     
-    const data = JSON.parse(text);
-
-    return Response.json({
-      success: true,
-      data: data
-    });
+    try {
+        const data = JSON.parse(text);
+        return Response.json({
+            success: true,
+            data: data
+        });
+    } catch (e) {
+         return Response.json({
+            success: true,
+            data: { raw_text: text },
+            error: "Failed to parse JSON from AI response"
+        });
+    }
 
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message, stack: err.stack }), { status: 500, headers: { "Content-Type": "application/json" } });

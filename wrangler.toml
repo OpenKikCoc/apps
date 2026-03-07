@@ -8,5 +8,6 @@ database_name = "apps-db"
 database_id = "8c728aa3-a2c0-4c6a-bb93-dc2e264b5401"
 
 [vars]
-# Add your Gemini API Key here or in Cloudflare Dashboard
-# AI_API_KEY = "your-api-key" # Keep it in [dev.vars]
+# Add your Volcengine Ark API Key and Endpoint ID here (local .dev.vars) or in Cloudflare Dashboard
+# AI_API_KEY = "your-volcengine-api-key"
+# AI_MODEL = "ark-code-latest" # For Coding Plan, use "ark-code-latest"
