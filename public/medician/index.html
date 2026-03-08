@@ -75,10 +75,10 @@
                     <!-- Symptom Tags Cloud -->
                     <div v-if="allTags.length > 0" class="d-flex flex-wrap gap-2 p-3 bg-white rounded shadow-sm border">
                         <span class="text-muted small align-self-center">按症状筛选:</span>
-                        <span @click="selectedTag = null" class="badge rounded-pill text-decoration-none cursor-pointer" :class="!selectedTag ? 'bg-success' : 'bg-light text-dark border'">全部</span>
-                        <span v-for="tag in allTags" :key="tag" @click="selectedTag = tag" 
+                        <span @click="clearTags" class="badge rounded-pill text-decoration-none cursor-pointer" :class="selectedTags.length === 0 ? 'bg-success' : 'bg-light text-dark border'">全部</span>
+                        <span v-for="tag in allTags" :key="tag" @click="toggleTag(tag)" 
                               class="badge rounded-pill text-decoration-none cursor-pointer" 
-                              :class="selectedTag === tag ? 'bg-success' : 'bg-success text-success bg-opacity-10 border border-success'">
+                              :class="selectedTags.includes(tag) ? 'bg-success' : 'bg-success text-success bg-opacity-10 border border-success'">
                             {{ tag }}
                         </span>
                     </div>
@@ -99,15 +99,19 @@
                                     <strong>数量:</strong> {{ item.quantity }} {{ item.unit }}<br>
                                     <strong>规格:</strong> {{ item.dosage || '-' }}
                                 </p>
-                                <div v-if="item.indications && item.indications.length" class="mt-2">
+                                <div v-if="item.indications && item.indications.length" class="mt-2 d-flex flex-wrap gap-1">
                                     <span v-for="tag in item.indications" :key="tag" 
-                                          @click.stop="selectedTag = tag"
-                                          class="badge bg-light text-secondary border me-1 cursor-pointer hover-shadow">
+                                          @click.stop="toggleTag(tag)"
+                                          class="badge border cursor-pointer hover-shadow text-wrap text-break text-start lh-base"
+                                          :class="selectedTags.includes(tag) ? 'bg-success text-white' : 'bg-light text-secondary'">
                                         {{ tag }}
                                     </span>
                                 </div>
                             </div>
                             <div class="card-footer bg-transparent text-end">
+                                <button class="btn btn-sm btn-outline-primary me-2" @click="editItem(item)">
+                                    <i class="bi bi-pencil"></i> 编辑
+                                </button>
                                 <button class="btn btn-sm btn-outline-danger" @click="deleteItem(item.id)">
                                     <i class="bi bi-trash"></i> 删除
                                 </button>
@@ -116,7 +120,7 @@
                     </div>
                         <div v-if="filteredItems.length === 0" class="col-12 text-center py-5 text-muted">
                         <p class="mb-3">没有找到匹配的药品。</p>
-                        <button v-if="selectedTag || searchQuery || showExpired" class="btn btn-outline-success" @click="resetFilters">清除筛选</button>
+                        <button v-if="selectedTags.length > 0 || searchQuery || showExpired" class="btn btn-outline-success" @click="resetFilters">清除筛选</button>
                         <button v-else class="btn btn-success" @click="view = 'add'">添加药品</button>
                     </div>
                 </div>
@@ -127,8 +131,8 @@
                 <div class="row justify-content-center">
                     <div class="col-md-8">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h4 class="mb-0">添加新药品</h4>
-                            <button class="btn btn-outline-secondary btn-sm" @click="view = 'list'">返回列表</button>
+                            <h4 class="mb-0">{{ form.id ? '编辑药品' : '添加新药品' }}</h4>
+                            <button class="btn btn-outline-secondary btn-sm" @click="resetForm(); view = 'list'">返回列表</button>
                         </div>
                         
                         <div class="card shadow-sm">
@@ -224,9 +228,9 @@
                                     </div>
                                 </div>
 
-                                <!-- Single Item Form (Manual Entry) - Only show if batchItems is empty -->
+                                <!-- Single Item Form (Manual Entry or Edit) - Only show if batchItems is empty -->
                                 <div v-if="batchItems.length === 0">
-                                    <div class="d-flex align-items-center mb-3">
+                                    <div class="d-flex align-items-center mb-3" v-if="!form.id">
                                         <hr class="flex-grow-1">
                                         <span class="px-2 text-muted small">或手动录入</span>
                                         <hr class="flex-grow-1">
@@ -287,7 +291,7 @@
                     view: 'list',
                     items: [],
                     searchQuery: '',
-                    selectedTag: null,
+                    selectedTags: [],
                     showExpired: false,
                     sortBy: 'name', // 'name' or 'expiry'
                     batchItems: [],
@@ -295,7 +299,7 @@
                     showCamera: false,
                     stream: null,
                     form: {
-                        name: '', quantity: 1, unit: '盒', expiry_date: '', 
+                        id: null, name: '', quantity: 1, unit: '盒', expiry_date: '', 
                         dosage: '', indications_str: '', brand: ''
                     }
                 }
@@ -320,9 +324,12 @@
                         result = result.filter(item => new Date(item.expiry_date) < today);
                     }
 
-                    // 2. Filter by Tag
-                    if (this.selectedTag) {
-                        result = result.filter(item => item.indications && item.indications.includes(this.selectedTag));
+                    // 2. Filter by Tag (Multi-select)
+                    if (this.selectedTags.length > 0) {
+                        result = result.filter(item => 
+                            item.indications && 
+                            this.selectedTags.some(tag => item.indications.includes(tag))
+                        );
                     }
 
                     // 3. Filter by Search
@@ -378,6 +385,24 @@
                     if (diffDays < 0) return { class: 'danger', text: 'Expired' };
                     if (diffDays < 30) return { class: 'warning', text: 'Expiring Soon' };
                     return { class: 'success', text: 'OK' };
+                },
+                toggleTag(tag) {
+                    const index = this.selectedTags.indexOf(tag);
+                    if (index === -1) {
+                        this.selectedTags.push(tag);
+                    } else {
+                        this.selectedTags.splice(index, 1);
+                    }
+                },
+                clearTags() {
+                    this.selectedTags = [];
+                },
+                editItem(item) {
+                    this.form = {
+                        ...item,
+                        indications_str: item.indications ? item.indications.join(', ') : ''
+                    };
+                    this.view = 'add';
                 },
                 async deleteItem(id) {
                     if(!confirm('确定删除?')) return;
@@ -520,8 +545,11 @@
                         indications: this.form.indications_str.split(/[,，]/).map(s => s.trim()).filter(s => s)
                     };
                     
-                    const res = await fetch(this.getApiUrl('/inventory'), {
-                        method: 'POST',
+                    const isEdit = !!this.form.id;
+                    const url = isEdit ? this.getApiUrl(`/item?id=${this.form.id}`) : this.getApiUrl('/inventory');
+                    
+                    const res = await fetch(url, {
+                        method: isEdit ? 'PUT' : 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
                     });
@@ -535,11 +563,11 @@
                     }
                 },
                 resetForm() {
-                    this.form = { name: '', quantity: 1, unit: '盒', expiry_date: '', dosage: '', indications_str: '', brand: '' };
+                    this.form = { id: null, name: '', quantity: 1, unit: '盒', expiry_date: '', dosage: '', indications_str: '', brand: '' };
                 },
                 resetFilters() {
                     this.searchQuery = '';
-                    this.selectedTag = null;
+                    this.selectedTags = [];
                     this.showExpired = false;
                 },
                 resetView() {

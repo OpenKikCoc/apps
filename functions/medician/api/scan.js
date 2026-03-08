@@ -53,7 +53,7 @@ export async function onRequestPost(context) {
             {
                 role: "user",
                 content: [
-                    { type: "text", text: "Identify this medicine. Return ONLY valid JSON with fields: name, brand, quantity (integer guess), unit, expiry_date (YYYY-MM-DD), dosage, indications (array of strings). Do not use markdown formatting." },
+                    { type: "text", text: "Identify this medicine. Return ONLY valid JSON with fields: name, brand, quantity (integer guess), unit, expiry_date (YYYY-MM-DD), dosage, indications (array of strings). Do not use markdown formatting. IMPORTANT: Ensure that the 'name', 'brand', 'dosage', and 'indications' are returned in the exact original language shown on the package (e.g., if the text is in Chinese, return Chinese; if in English, return English). Do not translate them." },
                     { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Image}` } }
                 ]
             }
